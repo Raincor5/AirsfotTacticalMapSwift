@@ -290,9 +290,13 @@
 				CODE_SIGN_ENTITLEMENTS = "Airsoft Tactical Map/Airsoft_Tactical_Map.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 57RFZBR94U;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Airsoft Tactical Map/Info.plist";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "This app uses local network to discover and connect with nearby team members for tactical coordination.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "This app needs location access to show your position on the tactical map and coordinate with your team.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs location access to show your position on the tactical map and coordinate with your team.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -319,9 +323,13 @@
 				CODE_SIGN_ENTITLEMENTS = "Airsoft Tactical Map/Airsoft_Tactical_Map.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 57RFZBR94U;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Airsoft Tactical Map/Info.plist";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "This app uses local network to discover and connect with nearby team members for tactical coordination.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "This app needs location access to show your position on the tactical map and coordinate with your team.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs location access to show your position on the tactical map and coordinate with your team.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

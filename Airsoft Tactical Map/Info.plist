@@ -2,9 +2,29 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_tactical-map._tcp</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.raincor.Airsoft-Tactical-Map.location-update</string>
+		<string>com.raincor.Airsoft-Tactical-Map.sync-data</string>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
+		<string>location</string>
+		<string>processing</string>
+		<string>fetch</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs location access to show your position on the tactical map and coordinate with your team.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app needs location access to show your position on the tactical map and coordinate with your team.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app uses local network to discover and connect with nearby team members for tactical coordination.</string>
 </dict>
 </plist>
