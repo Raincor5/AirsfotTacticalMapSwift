@@ -9,44 +9,18 @@ import SwiftUI
 import MapKit
 
 struct ContentView: View {
-    @StateObject private var multipeerGameManager = MultipeerGameManager()
     @StateObject private var webSocketGameManager = WebSocketGameManager()
     @StateObject private var locationManager = LocationManager()
-    @State private var useWebSocket = false
-    @State private var showingBackendSelection = true
     
     var body: some View {
         Group {
-            if showingBackendSelection {
-                BackendSelectionView(
-                    onMultipeerSelected: {
-                        useWebSocket = false
-                        showingBackendSelection = false
-                    },
-                    onWebSocketSelected: {
-                        useWebSocket = true
-                        showingBackendSelection = false
-                    },
-                    webSocketManager: webSocketGameManager
-                )
-            } else if useWebSocket && webSocketGameManager.gameSession == nil || !useWebSocket && multipeerGameManager.gameSession == nil {
-                if useWebSocket {
-                    SetupView(gameManager: webSocketGameManager)
-                } else {
-                    SetupView(gameManager: multipeerGameManager)
-                }
+            if webSocketGameManager.gameSession == nil {
+                SetupView(gameManager: webSocketGameManager)
             } else {
-                if useWebSocket {
-                    GameMapView(
-                        gameManager: webSocketGameManager,
-                        locationManager: locationManager
-                    )
-                } else {
-                    GameMapView(
-                        gameManager: multipeerGameManager,
-                        locationManager: locationManager
-                    )
-                }
+                GameMapView(
+                    gameManager: webSocketGameManager,
+                    locationManager: locationManager
+                )
             }
         }
         .preferredColorScheme(.dark)

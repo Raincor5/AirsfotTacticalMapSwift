@@ -549,8 +549,8 @@ enum MapAnnotationItem: Identifiable {
 }
 
 #Preview {
-    let gameManager = MultipeerGameManager()
-    return GameMapView(
+    let gameManager = WebSocketGameManager()
+    GameMapView(
         gameManager: gameManager,
         locationManager: LocationManager()
     )

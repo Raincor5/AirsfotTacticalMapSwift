@@ -281,5 +281,5 @@ extension Color {
 }
 
 #Preview {
-    TeamManagerView<MultipeerGameManager>(gameManager: MultipeerGameManager())
+    TeamManagerView<WebSocketGameManager>(gameManager: WebSocketGameManager())
 } 

@@ -12,6 +12,7 @@ struct SetupView<GameManager: GameManagerProtocol>: View {
     @State private var playerName = ""
     @State private var sessionCode = ""
     @State private var showingCreateOptions = false
+    @State private var showingServerConfiguration = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -36,6 +37,26 @@ struct SetupView<GameManager: GameManagerProtocol>: View {
                 ScrollView {
                     VStack(spacing: geometry.size.height < 700 ? 20 : 30) {
                         Spacer(minLength: geometry.size.height < 700 ? 30 : 50)
+                        
+                        // Server Configuration Button - Top Right
+                        HStack {
+                            Spacer()
+                            Button(action: { showingServerConfiguration = true }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "server.rack")
+                                        .font(.system(size: 14))
+                                    Text("SERVER CONFIG")
+                                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color.blue.opacity(0.8))
+                                .cornerRadius(8)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 10)
                         
                         // Title Section - responsive sizing
                         VStack(spacing: geometry.size.height < 700 ? 6 : 10) {
@@ -211,6 +232,11 @@ struct SetupView<GameManager: GameManagerProtocol>: View {
         } message: {
             Text("Start a new tactical operation and share the code with your team.")
         }
+        .sheet(isPresented: $showingServerConfiguration) {
+            if let webSocketManager = gameManager as? WebSocketGameManager {
+                ServerConfigurationView(webSocketManager: webSocketManager)
+            }
+        }
     }
 }
 
@@ -256,5 +282,5 @@ struct TacticalGridView: View {
 }
 
 #Preview {
-    SetupView<MultipeerGameManager>(gameManager: MultipeerGameManager())
+    SetupView<WebSocketGameManager>(gameManager: WebSocketGameManager())
 } 

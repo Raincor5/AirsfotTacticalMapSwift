@@ -303,7 +303,7 @@ extension Urgency {
 
 #Preview {
     TacticalAlertsView(
-        gameManager: MultipeerGameManager(),
+        gameManager: WebSocketGameManager(),
         locationManager: LocationManager()
     )
 } 

@@ -199,5 +199,5 @@ struct TacticalMessageRowView: View {
 }
 
 #Preview {
-    ChatView<MultipeerGameManager>(gameManager: MultipeerGameManager())
+    ChatView<WebSocketGameManager>(gameManager: WebSocketGameManager())
 } 
