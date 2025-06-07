@@ -26,5 +26,11 @@
 	<string>This app needs location access to show your position on the tactical map and coordinate with your team.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>This app uses local network to discover and connect with nearby team members for tactical coordination.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>This app uses Bluetooth for tactical team coordination and peer discovery.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>This app uses Bluetooth for tactical team coordination and peer discovery.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app uses the camera to scan QR codes for server configuration and tactical coordination setup.</string>
 </dict>
 </plist>

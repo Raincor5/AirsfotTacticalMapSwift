@@ -72,6 +72,28 @@ struct SessionInfoView<GameManager: GameManagerProtocol>: View {
                             .stroke((gameManager.isConnected ? Color.green : Color.red).opacity(0.3), lineWidth: 1)
                     )
                     
+                    // Debug Status (for TestFlight troubleshooting)
+                    if let multipeerManager = gameManager as? MultipeerGameManager {
+                        VStack(spacing: 4) {
+                            Text("DEBUG STATUS:")
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(.yellow)
+                            
+                            Text(multipeerManager.debugStatus)
+                                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                .foregroundColor(.yellow)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.black.opacity(0.4))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.yellow.opacity(0.3), lineWidth: 1)
+                        )
+                    }
+                    
                     // Players List
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {

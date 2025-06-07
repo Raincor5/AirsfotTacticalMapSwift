@@ -34,23 +34,23 @@ struct SetupView<GameManager: GameManagerProtocol>: View {
                     .ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 30) {
-                        Spacer(minLength: 50)
+                    VStack(spacing: geometry.size.height < 700 ? 20 : 30) {
+                        Spacer(minLength: geometry.size.height < 700 ? 30 : 50)
                         
-                        // Title Section
-                        VStack(spacing: 10) {
+                        // Title Section - responsive sizing
+                        VStack(spacing: geometry.size.height < 700 ? 6 : 10) {
                             Image(systemName: "scope")
-                                .font(.system(size: 60))
+                                .font(.system(size: geometry.size.height < 700 ? 45 : 60))
                                 .foregroundColor(.green)
                                 .shadow(color: .green.opacity(0.5), radius: 10)
                             
                             Text("AIRSOFT")
-                                .font(.system(size: 32, weight: .black, design: .monospaced))
+                                .font(.system(size: geometry.size.height < 700 ? 26 : 32, weight: .black, design: .monospaced))
                                 .foregroundColor(.white)
                                 .shadow(color: .black, radius: 2)
                             
                             Text("TACTICAL MAP")
-                                .font(.system(size: 24, weight: .bold, design: .monospaced))
+                                .font(.system(size: geometry.size.height < 700 ? 18 : 24, weight: .bold, design: .monospaced))
                                 .foregroundColor(.green)
                                 .shadow(color: .green.opacity(0.3), radius: 5)
                             
@@ -69,7 +69,7 @@ struct SetupView<GameManager: GameManagerProtocol>: View {
                                 )
                             #endif
                         }
-                        .padding(.bottom, 20)
+                        .padding(.bottom, geometry.size.height < 700 ? 12 : 20)
                         
                         // Player Name Input
                         VStack(alignment: .leading, spacing: 8) {
@@ -85,19 +85,19 @@ struct SetupView<GameManager: GameManagerProtocol>: View {
                         .padding(.horizontal, 20)
                         
                         // Action Buttons
-                        VStack(spacing: 15) {
+                        VStack(spacing: geometry.size.height < 700 ? 10 : 15) {
                             // Create Session Button
                             Button(action: {
                                 showingCreateOptions = true
                             }) {
                                 HStack {
                                     Image(systemName: "plus.circle.fill")
-                                        .font(.title2)
+                                        .font(geometry.size.height < 700 ? .title3 : .title2)
                                     Text("CREATE OPERATION")
-                                        .font(.system(size: 16, weight: .bold, design: .monospaced))
+                                        .font(.system(size: geometry.size.height < 700 ? 14 : 16, weight: .bold, design: .monospaced))
                                 }
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 56)
+                                .frame(height: geometry.size.height < 700 ? 48 : 56)
                                 .background(
                                     LinearGradient(
                                         gradient: Gradient(colors: [Color.green, Color.green.opacity(0.8)]),
@@ -113,9 +113,9 @@ struct SetupView<GameManager: GameManagerProtocol>: View {
                             .opacity(playerName.isEmpty ? 0.5 : 1.0)
                             
                             // Join Session Section
-                            VStack(spacing: 12) {
+                            VStack(spacing: geometry.size.height < 700 ? 8 : 12) {
                                 Text("JOIN EXISTING OPERATION")
-                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                    .font(.system(size: geometry.size.height < 700 ? 11 : 12, weight: .bold, design: .monospaced))
                                     .foregroundColor(.gray)
                                 
                                 TextField("OPERATION CODE", text: $sessionCode)
@@ -128,12 +128,12 @@ struct SetupView<GameManager: GameManagerProtocol>: View {
                                 }) {
                                     HStack {
                                         Image(systemName: "person.badge.plus")
-                                            .font(.title2)
+                                            .font(geometry.size.height < 700 ? .title3 : .title2)
                                         Text("JOIN OPERATION")
-                                            .font(.system(size: 16, weight: .bold, design: .monospaced))
+                                            .font(.system(size: geometry.size.height < 700 ? 14 : 16, weight: .bold, design: .monospaced))
                                     }
                                     .frame(maxWidth: .infinity)
-                                    .frame(height: 56)
+                                    .frame(height: geometry.size.height < 700 ? 48 : 56)
                                     .background(
                                         LinearGradient(
                                             gradient: Gradient(colors: [Color.blue, Color.blue.opacity(0.8)]),

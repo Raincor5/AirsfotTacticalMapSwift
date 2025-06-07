@@ -39,6 +39,7 @@ class MultipeerGameManager: NSObject, ObservableObject, GameManagerProtocol {
     @Published var connectionError: String?
     @Published var nearbyPlayers: [String] = [] // Players discovered but not yet connected
     @Published var connectedPeers: [MCPeerID] = []
+    @Published var debugStatus: String = "Ready" // For TestFlight debugging
     
     // Check if running in simulator
     private var isSimulator: Bool {
@@ -52,7 +53,7 @@ class MultipeerGameManager: NSObject, ObservableObject, GameManagerProtocol {
     private let serviceType = "tactical-map"
     private var peerID: MCPeerID
     private var mcSession: MCSession
-    private var mcAdvertiserAssistant: MCAdvertiserAssistant?
+    private var mcNearbyServiceAdvertiser: MCNearbyServiceAdvertiser?
     private var mcNearbyServiceBrowser: MCNearbyServiceBrowser?
     
     override init() {
@@ -60,8 +61,8 @@ class MultipeerGameManager: NSObject, ObservableObject, GameManagerProtocol {
         let deviceName = UIDevice.current.name
         self.peerID = MCPeerID(displayName: "\(deviceName)_\(String(Int.random(in: 1000...9999)))")
         
-        // Create session
-        self.mcSession = MCSession(peer: peerID, securityIdentity: nil, encryptionPreference: .required)
+        // Create session - use .optional for iOS 16 compatibility on older devices
+        self.mcSession = MCSession(peer: peerID, securityIdentity: nil, encryptionPreference: .optional)
         
         super.init()
         
@@ -135,9 +136,10 @@ class MultipeerGameManager: NSObject, ObservableObject, GameManagerProtocol {
         print("🔍 Looking for session with code: \(code)")
         
         // Set a timeout to stop searching if no session found
-        DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
             if !self.isConnected && self.searchingForSessionCode != nil {
-                self.connectionError = "Session '\(code)' not found. Make sure the host has started the session."
+                self.connectionError = "Session '\(code)' not found. Check: 1) Same Wi-Fi network, 2) Local Network permission enabled, 3) Host has started session"
+                self.debugStatus = "Search timed out after 30s"
                 self.searchingForSessionCode = nil
                 self.stopBrowsing()
                 print("⏰ Session search timed out for code: \(code)")
@@ -166,24 +168,43 @@ class MultipeerGameManager: NSObject, ObservableObject, GameManagerProtocol {
     // MARK: - Multipeer Connectivity
     
     private func startHosting() {
-        mcAdvertiserAssistant = MCAdvertiserAssistant(serviceType: serviceType, discoveryInfo: [
+        let discoveryInfo = [
             "sessionCode": gameSession?.code ?? "",
             "hostName": currentUser?.name ?? ""
-        ], session: mcSession)
-        mcAdvertiserAssistant?.start()
-        print("📡 Started advertising session")
+        ]
+        print("📡 Starting to advertise session with info: \(discoveryInfo)")
+        print("📡 Service type: \(serviceType)")
+        print("📡 Session code: \(gameSession?.code ?? "NO CODE")")
+        
+        mcNearbyServiceAdvertiser = MCNearbyServiceAdvertiser(peer: peerID, discoveryInfo: discoveryInfo, serviceType: serviceType)
+        mcNearbyServiceAdvertiser?.delegate = self
+        mcNearbyServiceAdvertiser?.startAdvertisingPeer()
+        
+        DispatchQueue.main.async {
+            self.debugStatus = "Broadcasting session \(self.gameSession?.code ?? "")"
+        }
+        print("📡 Started advertising session successfully")
     }
     
     private func stopHosting() {
-        mcAdvertiserAssistant?.stop()
-        mcAdvertiserAssistant = nil
+        mcNearbyServiceAdvertiser?.stopAdvertisingPeer()
+        mcNearbyServiceAdvertiser = nil
     }
     
     private func startBrowsing() {
+        print("🔍 Starting to browse for sessions")
+        print("🔍 Service type: \(serviceType)")
+        print("🔍 Searching for session code: \(searchingForSessionCode ?? "NO CODE")")
+        print("🔍 Peer ID: \(peerID.displayName)")
+        
         mcNearbyServiceBrowser = MCNearbyServiceBrowser(peer: peerID, serviceType: serviceType)
         mcNearbyServiceBrowser?.delegate = self
         mcNearbyServiceBrowser?.startBrowsingForPeers()
-        print("🔍 Started browsing for sessions")
+        
+        DispatchQueue.main.async {
+            self.debugStatus = "Searching for session \(self.searchingForSessionCode ?? "")"
+        }
+        print("🔍 Started browsing for sessions successfully")
     }
     
     private func stopBrowsing() {
@@ -788,11 +809,11 @@ extension MultipeerGameManager: MCSessionDelegate {
                     
                     // Send full player data including location
                     var playerData: [String: Any] = [
-                        "id": currentUser.id,
-                        "name": currentUser.name,
-                        "isHost": currentUser.isHost,
-                        "teamId": currentUser.teamId as Any
-                    ]
+                            "id": currentUser.id,
+                            "name": currentUser.name,
+                            "isHost": currentUser.isHost,
+                            "teamId": currentUser.teamId as Any
+                        ]
                     
                     // Include location if available
                     if let location = currentUser.location {
@@ -850,10 +871,34 @@ extension MultipeerGameManager: MCSessionDelegate {
     }
 }
 
+// MARK: - MCNearbyServiceAdvertiserDelegate  
+extension MultipeerGameManager: MCNearbyServiceAdvertiserDelegate {
+    func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
+        print("📧 Received invitation from: \(peerID.displayName)")
+        DispatchQueue.main.async {
+            self.debugStatus = "Invitation from \(peerID.displayName)"
+        }
+        // Auto-accept invitations (host accepts all joiners)
+        invitationHandler(true, mcSession)
+    }
+    
+    func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {
+        print("❌ Failed to start advertising: \(error.localizedDescription)")
+        DispatchQueue.main.async {
+            self.connectionError = "Failed to start hosting: \(error.localizedDescription)"
+            self.debugStatus = "Advertising failed: \(error.localizedDescription)"
+        }
+    }
+}
+
 // MARK: - MCNearbyServiceBrowserDelegate
 extension MultipeerGameManager: MCNearbyServiceBrowserDelegate {
     func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String : String]?) {
         print("🔍 Found peer: \(peerID.displayName) with info: \(info ?? [:])")
+        
+        DispatchQueue.main.async {
+            self.debugStatus = "Found peer: \(peerID.displayName) | Info: \(info ?? [:])"
+        }
         
         // Only join if we're looking for a session and the session code matches
         if !isHost, let searchCode = searchingForSessionCode {
@@ -861,9 +906,17 @@ extension MultipeerGameManager: MCNearbyServiceBrowserDelegate {
                sessionCode.uppercased() == searchCode {
                 print("✅ Found matching session! Code: \(sessionCode)")
                 print("📱 Inviting peer: \(peerID.displayName)")
+                
+                DispatchQueue.main.async {
+                    self.debugStatus = "Connecting to \(peerID.displayName)..."
+                }
+                
                 browser.invitePeer(peerID, to: mcSession, withContext: nil, timeout: 10)
             } else {
                 print("❌ Session code mismatch. Expected: \(searchCode), Found: \(info?["sessionCode"] ?? "none")")
+                DispatchQueue.main.async {
+                    self.debugStatus = "Wrong session code from \(peerID.displayName)"
+                }
             }
         } else if !isHost {
             print("❌ Not searching for any session code")
@@ -874,6 +927,14 @@ extension MultipeerGameManager: MCNearbyServiceBrowserDelegate {
         print("❌ Lost peer: \(peerID.displayName)")
         DispatchQueue.main.async {
             self.nearbyPlayers.removeAll { $0 == peerID.displayName }
+        }
+    }
+    
+    func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {
+        print("❌ Failed to start browsing: \(error.localizedDescription)")
+        DispatchQueue.main.async {
+            self.connectionError = "Failed to start peer discovery: \(error.localizedDescription)"
+            self.debugStatus = "Browse failed: \(error.localizedDescription)"
         }
     }
 } 

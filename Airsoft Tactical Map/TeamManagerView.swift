@@ -10,6 +10,8 @@ import SwiftUI
 struct TeamManagerView<GameManager: GameManagerProtocol>: View {
     @ObservedObject var gameManager: GameManager
     @Environment(\.presentationMode) var presentationMode
+    @State private var debugAlert: String = ""
+    @State private var showingDebugAlert = false
     
     var body: some View {
         NavigationView {
@@ -104,6 +106,17 @@ struct TeamManagerView<GameManager: GameManagerProtocol>: View {
             )
         }
         .preferredColorScheme(.dark)
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ShowDebugAlert"))) { notification in
+            if let message = notification.object as? String {
+                debugAlert = message
+                showingDebugAlert = true
+            }
+        }
+        .alert("Debug Info", isPresented: $showingDebugAlert) {
+            Button("OK") { }
+        } message: {
+            Text(debugAlert)
+        }
     }
     
     private var allPlayers: [Player] {

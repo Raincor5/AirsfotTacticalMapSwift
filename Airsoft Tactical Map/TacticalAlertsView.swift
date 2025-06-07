@@ -68,9 +68,9 @@ struct TacticalAlertsView<GameManager: GameManagerProtocol>: View {
                                 .font(.headline)
                                 .foregroundColor(.primary)
                             
-                            TextField("Additional details...", text: $customMessage, axis: .vertical)
+                            TextField("Additional details...", text: $customMessage)
                                 .textFieldStyle(.roundedBorder)
-                                .lineLimit(3...5)
+                                .lineLimit(5)
                         }
                         
                         // Urgency Level
@@ -123,13 +123,11 @@ struct TacticalAlertsView<GameManager: GameManagerProtocol>: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+            .navigationBarItems(leading: 
+                Button("Cancel") {
+                    dismiss()
                 }
-            }
+            )
         }
         .onAppear {
             customMessage = getDefaultMessage(for: selectedAlertType)
@@ -154,11 +152,17 @@ struct TacticalAlertsView<GameManager: GameManagerProtocol>: View {
         // Send as local notification to team (for MultipeerConnectivity)
         notificationManager.sendTacticalAlert(alert)
         
-        // Also send as team message through game manager
-        let alertMessage = "🚨 \(selectedAlertType.displayName.uppercased()): \(customMessage)"
-        gameManager.sendGameMessage(alertMessage)
+        // Safety check: Only send game message if we have a current user and are connected
+        if gameManager.currentUser != nil && gameManager.isConnected {
+            let alertMessage = "🚨 \(selectedAlertType.displayName.uppercased()): \(customMessage)"
+            gameManager.sendGameMessage(alertMessage)
+            print("🚨 Tactical alert sent: \(selectedAlertType.displayName)")
+        } else {
+            print("⚠️ Cannot send tactical alert - no current user or not connected")
+            print("   Current user: \(gameManager.currentUser?.name ?? "nil")")
+            print("   Connected: \(gameManager.isConnected)")
+        }
         
-        print("🚨 Tactical alert sent: \(selectedAlertType.displayName)")
         dismiss()
     }
     

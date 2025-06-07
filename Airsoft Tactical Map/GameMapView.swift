@@ -25,6 +25,8 @@ struct GameMapView<GameManager: GameManagerProtocol>: View {
     @State private var showingTacticalAlerts = false
     @State private var pendingPinCoordinate: CLLocationCoordinate2D?
     @State private var pulseScale: CGFloat = 1.0
+    @State private var hasInitiallySetRegion = false
+    @State private var shouldAutoCenter = true
     
     var body: some View {
         ZStack {
@@ -46,6 +48,17 @@ struct GameMapView<GameManager: GameManagerProtocol>: View {
                     }
                 }
             }
+            .onTapGesture {
+                // Disable auto-centering when user taps the map
+                shouldAutoCenter = false
+            }
+            .simultaneousGesture(
+                DragGesture()
+                    .onChanged { _ in
+                        // Disable auto-centering when user pans the map
+                        shouldAutoCenter = false
+                    }
+            )
             
             // Tactical crosshair for pin placement
             VStack {
@@ -88,11 +101,20 @@ struct GameMapView<GameManager: GameManagerProtocol>: View {
                 pulseScale = 1.2
             }
             .onAppear {
+                if !hasInitiallySetRegion {
                 updateMapRegion()
+                    hasInitiallySetRegion = true
+                }
             }
             .onChange(of: locationManager.location) { _ in
-                updateMapRegion()
                 updatePlayerLocation()
+                
+                // Only auto-center on first location fix or if explicitly enabled
+                if shouldAutoCenter && !hasInitiallySetRegion {
+                    updateMapRegion()
+                    hasInitiallySetRegion = true
+                    shouldAutoCenter = false // Disable auto-centering after first time
+                }
             }
             
             // UI Overlays
@@ -126,6 +148,73 @@ struct GameMapView<GameManager: GameManagerProtocol>: View {
                     
                     Spacer()
                     
+                    // Top-Right Button Stack (Chat & Quick Messages)
+                    VStack(spacing: 8) {
+                        // Chat Button
+                        Button(action: { showingChat = true }) {
+                            ZStack {
+                                VStack(spacing: 2) {
+                                    Image(systemName: "text.bubble.fill")
+                                        .font(.title3)
+                                    Text("CHAT")
+                                        .font(.system(size: 7, weight: .bold, design: .monospaced))
+                                }
+                                .foregroundColor(.black)
+                                .frame(width: 50, height: 50)
+                                .background(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [Color.green, Color.green.opacity(0.8)]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                .clipShape(Circle())
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.green.opacity(0.3), lineWidth: 2)
+                                )
+                                .shadow(color: .green.opacity(0.3), radius: 3)
+                                
+                                // Unread message indicator
+                                if hasUnreadMessages {
+                                    Circle()
+                                        .fill(Color.red)
+                                        .frame(width: 12, height: 12)
+                                        .overlay(
+                                            Circle()
+                                                .stroke(Color.white, lineWidth: 1)
+                                        )
+                                        .offset(x: 15, y: -15)
+                                }
+                            }
+                        }
+                        
+                        // Quick Messages Button
+                        Button(action: { showingQuickMessages = true }) {
+                            VStack(spacing: 2) {
+                                Image(systemName: "bolt.fill")
+                                    .font(.title3)
+                                Text("QUICK")
+                                    .font(.system(size: 7, weight: .bold, design: .monospaced))
+                            }
+                            .foregroundColor(.black)
+                            .frame(width: 50, height: 50)
+                            .background(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [Color.blue, Color.blue.opacity(0.8)]),
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.blue.opacity(0.3), lineWidth: 2)
+                            )
+                            .shadow(color: .blue.opacity(0.3), radius: 3)
+                        }
+                    }
+                    
                     // Connection Status
                     HStack(spacing: 4) {
                         if gameManager.isConnected {
@@ -151,49 +240,28 @@ struct GameMapView<GameManager: GameManagerProtocol>: View {
                 }
                 .padding()
                 
-                Spacer()
-                
-                // Bottom Controls
+                // Middle Right Side Controls (Pin & Alert)
                 HStack {
-                    // Quick Messages
-                    Button(action: { showingQuickMessages = true }) {
-                        VStack(spacing: 2) {
-                            Image(systemName: "bolt.fill")
-                                .font(.title2)
-                            Text("QUICK")
-                                .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        }
-                        .foregroundColor(.black)
-                        .frame(width: 55, height: 55)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color.blue, Color.blue.opacity(0.8)]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .clipShape(Circle())
-                        .overlay(
-                            Circle()
-                                .stroke(Color.blue.opacity(0.3), lineWidth: 2)
-                        )
-                        .shadow(color: .blue.opacity(0.3), radius: 3)
-                    }
+                    Spacer()
                     
-                    // Chat
-                    Button(action: { showingChat = true }) {
-                        ZStack {
+                    VStack(spacing: 12) {
+                        // Pin Placement
+                        Button(action: {
+                            // Place pin at crosshair location (map center)
+                            pendingPinCoordinate = mapRegion.center
+                            showingPinSelector = true
+                        }) {
                             VStack(spacing: 2) {
-                                Image(systemName: "text.bubble.fill")
-                                    .font(.title2)
-                                Text("CHAT")
-                                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                Image(systemName: "mappin.and.ellipse")
+                                    .font(.title3)
+                                Text("PIN")
+                                    .font(.system(size: 7, weight: .bold, design: .monospaced))
                             }
-                            .foregroundColor(.black)
-                            .frame(width: 55, height: 55)
+                            .foregroundColor(.white)
+                            .frame(width: 50, height: 50)
                             .background(
                                 LinearGradient(
-                                    gradient: Gradient(colors: [Color.green, Color.green.opacity(0.8)]),
+                                    gradient: Gradient(colors: [Color.red, Color.red.opacity(0.8)]),
                                     startPoint: .top,
                                     endPoint: .bottom
                                 )
@@ -201,78 +269,43 @@ struct GameMapView<GameManager: GameManagerProtocol>: View {
                             .clipShape(Circle())
                             .overlay(
                                 Circle()
-                                    .stroke(Color.green.opacity(0.3), lineWidth: 2)
+                                    .stroke(Color.red.opacity(0.3), lineWidth: 2)
                             )
-                            .shadow(color: .green.opacity(0.3), radius: 3)
-                            
-                            // Unread message indicator
-                            if hasUnreadMessages {
-                                Circle()
-                                    .fill(Color.red)
-                                    .frame(width: 14, height: 14)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.white, lineWidth: 2)
-                                    )
-                                    .offset(x: 18, y: -18)
+                            .shadow(color: .red.opacity(0.3), radius: 3)
+                        }
+                        
+                        // Tactical Alerts
+                        Button(action: { showingTacticalAlerts = true }) {
+                            VStack(spacing: 2) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.title3)
+                                Text("ALERT")
+                                    .font(.system(size: 7, weight: .bold, design: .monospaced))
                             }
-                        }
-                    }
-                    
-                    // Pin Placement
-                    Button(action: {
-                        // Place pin at crosshair location (map center)
-                        pendingPinCoordinate = mapRegion.center
-                        showingPinSelector = true
-                    }) {
-                        VStack(spacing: 2) {
-                            Image(systemName: "mappin.and.ellipse")
-                                .font(.title2)
-                            Text("PIN")
-                                .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        }
-                        .foregroundColor(.white)
-                        .frame(width: 55, height: 55)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color.red, Color.red.opacity(0.8)]),
-                                startPoint: .top,
-                                endPoint: .bottom
+                            .foregroundColor(.black)
+                            .frame(width: 50, height: 50)
+                            .background(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [Color.yellow, Color.yellow.opacity(0.8)]),
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
                             )
-                        )
-                        .clipShape(Circle())
-                        .overlay(
-                            Circle()
-                                .stroke(Color.red.opacity(0.3), lineWidth: 2)
-                        )
-                        .shadow(color: .red.opacity(0.3), radius: 3)
-                    }
-                    
-                    // Tactical Alerts
-                    Button(action: { showingTacticalAlerts = true }) {
-                        VStack(spacing: 2) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.title2)
-                            Text("ALERT")
-                                .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        }
-                        .foregroundColor(.black)
-                        .frame(width: 55, height: 55)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color.yellow, Color.yellow.opacity(0.8)]),
-                                startPoint: .top,
-                                endPoint: .bottom
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.yellow.opacity(0.3), lineWidth: 2)
                             )
-                        )
-                        .clipShape(Circle())
-                        .overlay(
-                            Circle()
-                                .stroke(Color.yellow.opacity(0.3), lineWidth: 2)
-                        )
-                        .shadow(color: .yellow.opacity(0.3), radius: 3)
+                            .shadow(color: .yellow.opacity(0.3), radius: 3)
+                        }
                     }
-                    
+                    .padding(.trailing, 20)
+                }
+                
+                Spacer()
+                
+                // Bottom Controls (Center & Teams)
+                HStack {
                     Spacer()
                     
                     // Center on User
@@ -281,7 +314,7 @@ struct GameMapView<GameManager: GameManagerProtocol>: View {
                             Image(systemName: "scope")
                                 .font(.title2)
                             Text("CENTER")
-                                .font(.system(size: 7, weight: .bold, design: .monospaced))
+                                .font(.system(size: 8, weight: .bold, design: .monospaced))
                         }
                         .foregroundColor(.white)
                         .frame(width: 55, height: 55)
@@ -476,6 +509,11 @@ struct GameMapView<GameManager: GameManagerProtocol>: View {
                     center: location.coordinate,
                     span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
                 )
+            }
+            // Re-enable auto-centering for a brief moment if user manually centers
+            shouldAutoCenter = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                shouldAutoCenter = false
             }
         }
     }

@@ -26,7 +26,8 @@ struct ContentView: View {
                     onWebSocketSelected: {
                         useWebSocket = true
                         showingBackendSelection = false
-                    }
+                    },
+                    webSocketManager: webSocketGameManager
                 )
             } else if useWebSocket && webSocketGameManager.gameSession == nil || !useWebSocket && multipeerGameManager.gameSession == nil {
                 if useWebSocket {

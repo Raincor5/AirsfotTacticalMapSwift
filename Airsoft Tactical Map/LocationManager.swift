@@ -62,11 +62,7 @@ class LocationManager: NSObject, ObservableObject {
     
     var playerLocation: PlayerLocation? {
         guard let location = location else { return nil }
-        return PlayerLocation(
-            latitude: location.coordinate.latitude,
-            longitude: location.coordinate.longitude,
-            heading: heading?.trueHeading
-        )
+        return PlayerLocation(from: location, heading: heading?.trueHeading)
     }
 }
 

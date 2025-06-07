@@ -31,17 +31,34 @@ struct PlayerLocation: Codable {
     let latitude: Double
     let longitude: Double
     let heading: Double?
+    let altitude: Double?
+    let accuracy: Double?
+    let speed: Double?
     let timestamp: Date
     
-    init(latitude: Double, longitude: Double, heading: Double? = nil, timestamp: Date = Date()) {
+    init(latitude: Double, longitude: Double, heading: Double? = nil, altitude: Double? = nil, accuracy: Double? = nil, speed: Double? = nil, timestamp: Date = Date()) {
         self.latitude = latitude
         self.longitude = longitude
         self.heading = heading
+        self.altitude = altitude
+        self.accuracy = accuracy
+        self.speed = speed
         self.timestamp = timestamp
     }
     
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+    
+    // Convenience initializer for CLLocation
+    init(from location: CLLocation, heading: Double? = nil) {
+        self.latitude = location.coordinate.latitude
+        self.longitude = location.coordinate.longitude
+        self.heading = heading
+        self.altitude = location.altitude
+        self.accuracy = location.horizontalAccuracy
+        self.speed = location.speed >= 0 ? location.speed : nil
+        self.timestamp = location.timestamp
     }
 }
 
