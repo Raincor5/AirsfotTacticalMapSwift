@@ -63,21 +63,27 @@ struct PlayerLocation: Codable {
 }
 
 // MARK: - Team Model
-struct Team: Codable, Identifiable {
+struct Team: Codable, Identifiable, Equatable {
     let id: String
     let name: String
     let color: String
     
     var swiftUIColor: Color {
         switch color.lowercased() {
-        case "red": return .red
-        case "blue": return .blue
-        case "green": return .green
-        case "yellow": return .yellow
-        case "purple": return .purple
-        case "orange": return .orange
+        case "red": return Color(red: 0.9, green: 0.2, blue: 0.2)
+        case "blue": return Color(red: 0.2, green: 0.4, blue: 0.9)
+        case "green": return Color(red: 0.2, green: 0.8, blue: 0.3)
+        case "yellow": return Color(red: 0.9, green: 0.8, blue: 0.2)
+        case "purple": return Color(red: 0.6, green: 0.2, blue: 0.9)
+        case "orange": return Color(red: 0.9, green: 0.5, blue: 0.2)
+        case "#ff0000": return Color(red: 1.0, green: 0.0, blue: 0.0)
+        case "#0000ff": return Color(red: 0.0, green: 0.0, blue: 1.0)
         default: return .gray
         }
+    }
+    
+    static func == (lhs: Team, rhs: Team) -> Bool {
+        lhs.id == rhs.id
     }
 }
 
@@ -199,6 +205,103 @@ enum PinType: String, CaseIterable {
         case .cover: return .brown
         }
     }
+}
+
+// MARK: - Game Phase
+enum GamePhase: String, Codable {
+    case waiting = "waiting"
+    case active = "active"
+    case paused = "paused"
+    case ended = "ended"
+}
+
+// Add after existing models in Models.swift
+
+// MARK: - Server Communication Models
+struct ServerInput: Codable {
+    let sequence: Int
+    let type: String
+    let data: InputData
+    let timestamp: Date
+}
+
+struct InputData: Codable {
+    // For movement
+    var latitude: Double?
+    var longitude: Double?
+    var heading: Double?
+    var speed: Double?
+    var timestamp: Date?
+    
+    // For pins
+    var type: String?
+    var position: PinCoordinate?
+    var pinId: String?
+}
+
+struct GameSnapshot: Codable {
+    let tick: Int
+    let timestamp: Date
+    var players: [PlayerState]
+    var pins: [Pin]
+    let objectives: [Objective]
+    let gamePhase: String
+    let scores: [String: Int]
+}
+
+struct GameDelta: Codable {
+    let fromTick: Int
+    let toTick: Int
+    let timestamp: Date
+    let changes: DeltaChanges
+}
+
+struct DeltaChanges: Codable {
+    let players: [String: PlayerState]
+    let pins: PinChanges
+    let events: [GameEvent]
+}
+
+struct PinChanges: Codable {
+    let added: [Pin]
+    let removed: [String]
+}
+
+struct PlayerState: Codable {
+    let id: String
+    let name: String
+    let teamId: String?
+    let isHost: Bool
+    var position: PlayerPosition?
+    let health: Int
+    let score: Int
+}
+
+struct PlayerPosition: Codable {
+    let latitude: Double
+    let longitude: Double
+    let heading: Double
+    let speed: Double
+    let lastUpdate: Date
+    let clientTimestamp: Date?
+}
+
+struct Objective: Codable {
+    let id: String
+    let name: String
+    let position: PinCoordinate
+    let teamId: String?
+    let status: String
+}
+
+struct GameEvent: Codable {
+    let type: String
+    let data: EventData
+    let tick: Int
+}
+
+struct EventData: Codable {
+    // Generic container for event-specific data
 }
 
 // MARK: - Quick Messages

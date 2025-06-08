@@ -19,17 +19,16 @@ struct ContentView: View {
             } else {
                 GameMapView(
                     gameManager: webSocketGameManager,
-                    locationManager: locationManager
+                    locationManager: locationManager,
+                    networkManager: webSocketGameManager.networkManager
                 )
             }
         }
         .preferredColorScheme(.dark)
         .onAppear {
             locationManager.requestLocationPermission()
+            webSocketGameManager.networkManager.startInterpolation()
         }
+        .environmentObject(webSocketGameManager.networkManager)
     }
-}
-
-#Preview {
-    ContentView()
 }

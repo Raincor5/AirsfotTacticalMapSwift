@@ -11,7 +11,8 @@ import MapKit
 struct GameMapView<GameManager: GameManagerProtocol>: View {
     @ObservedObject var gameManager: GameManager
     @ObservedObject var locationManager: LocationManager
-    
+    @ObservedObject var networkManager: NetworkManager
+
     @State private var mapRegion = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
         span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
@@ -27,372 +28,273 @@ struct GameMapView<GameManager: GameManagerProtocol>: View {
     @State private var pulseScale: CGFloat = 1.0
     @State private var hasInitiallySetRegion = false
     @State private var shouldAutoCenter = true
+    @State private var lastUpdateTime = Date()
+    
+    // Timer for periodic UI updates
+    let updateTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
     
     var body: some View {
-        ZStack {
-            // Map
-            Map(coordinateRegion: $mapRegion, annotationItems: allMapItems) { item in
-                MapAnnotation(coordinate: item.coordinate) {
-                    switch item {
-                    case .player(let player, _, let isCurrentUser):
-                        PlayerMarkerView(
-                            player: player,
-                            isCurrentUser: isCurrentUser,
-                            currentUserTeamId: gameManager.currentUser?.teamId,
-                            teams: gameManager.gameSession?.teams ?? []
-                        )
-                    case .pin(let pin, _):
-                        PinMarkerView(pin: pin) {
-                            gameManager.removePin(pin.id)
+        GeometryReader { geometry in
+            ZStack {
+                // Map
+                Map(coordinateRegion: $mapRegion, annotationItems: allMapItems) { item in
+                    MapAnnotation(coordinate: item.coordinate) {
+                        switch item {
+                        case .player(let player, _, let isCurrentUser):
+                            PlayerMarkerView(
+                                player: player,
+                                isCurrentUser: isCurrentUser,
+                                currentUserTeamId: gameManager.currentUser?.teamId,
+                                teams: gameManager.gameSession?.teams ?? []
+                            )
+                        case .pin(let pin, _):
+                            PinMarkerView(pin: pin) {
+                                gameManager.removePin(pin.id)
+                            }
                         }
                     }
                 }
-            }
-            .onTapGesture {
-                // Disable auto-centering when user taps the map
-                shouldAutoCenter = false
-            }
-            .simultaneousGesture(
-                DragGesture()
-                    .onChanged { _ in
-                        // Disable auto-centering when user pans the map
-                        shouldAutoCenter = false
+                .onTapGesture {
+                    shouldAutoCenter = false
+                }
+                .simultaneousGesture(
+                    DragGesture()
+                        .onChanged { _ in
+                            shouldAutoCenter = false
+                        }
+                )
+                .overlay(
+                    VStack {
+                        HStack {
+                            NetworkStatsView(networkManager: networkManager)
+                            Spacer()
+                        }
+                        Spacer()
                     }
-            )
-            
-            // Tactical crosshair for pin placement
-            VStack {
-                Spacer()
-                HStack {
+                    .padding()
+                    .allowsHitTesting(false),
+                    alignment: .topLeading
+)
+                // Tactical crosshair for pin placement
+                VStack {
                     Spacer()
-                    ZStack {
-                        // Outer ring
-                        Circle()
-                            .stroke(Color.green.opacity(0.8), lineWidth: 2)
-                            .frame(width: 40, height: 40)
-                        
-                        // Inner crosshair
-                        Image(systemName: "plus")
-                            .font(.title2)
-                            .foregroundColor(.green)
-                            .background(
-                                Circle()
-                                    .fill(Color.black.opacity(0.7))
-                                    .frame(width: 20, height: 20)
-                            )
-                        
-                        // Animated pulse
-                        Circle()
-                            .stroke(Color.green.opacity(0.3), lineWidth: 1)
-                            .frame(width: 60, height: 60)
-                            .scaleEffect(pulseScale)
-                            .animation(
-                                Animation.easeInOut(duration: 1.5)
-                                    .repeatForever(autoreverses: true),
-                                value: pulseScale
-                            )
+                    HStack {
+                        Spacer()
+                        ZStack {
+                            Circle()
+                                .stroke(Color.green.opacity(0.8), lineWidth: 2)
+                                .frame(width: 40, height: 40)
+                            
+                            Image(systemName: "plus")
+                                .font(.title2)
+                                .foregroundColor(.green)
+                                .background(
+                                    Circle()
+                                        .fill(Color.black.opacity(0.7))
+                                        .frame(width: 20, height: 20)
+                                )
+                            
+                            Circle()
+                                .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                                .frame(width: 60, height: 60)
+                                .scaleEffect(pulseScale)
+                                .animation(
+                                    Animation.easeInOut(duration: 1.5)
+                                        .repeatForever(autoreverses: true),
+                                    value: pulseScale
+                                )
+                        }
+                        Spacer()
                     }
                     Spacer()
                 }
-                Spacer()
-            }
-            .allowsHitTesting(false)
-            .onAppear {
-                pulseScale = 1.2
+                .allowsHitTesting(false)
+                .onAppear {
+                    pulseScale = 1.2
+                }
+                
+                // UI Overlays - Responsive to screen size
+                VStack(spacing: 0) {
+                    // Top Bar
+                    HStack(alignment: .top) {
+                        // Session Info Button
+                        Button(action: { showingSessionInfo = true }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "shield.lefthalf.filled")
+                                    .font(.caption)
+                                Text(gameManager.sessionCode ?? "N/A")
+                                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                Divider()
+                                    .frame(height: 12)
+                                Image(systemName: "person.2.fill")
+                                    .font(.caption)
+                                Text("\(totalPlayerCount)")
+                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.black.opacity(0.8))
+                            .foregroundColor(.green)
+                            .cornerRadius(20)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                        
+                        Spacer()
+                        
+                        // Connection Status
+                        HStack(spacing: 4) {
+                            if gameManager.isConnected {
+                                Image(systemName: "antenna.radiowaves.left.and.right")
+                                    .foregroundColor(.green)
+                                    .font(.caption)
+                                Text("ONLINE")
+                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.green)
+                            } else {
+                                Image(systemName: "antenna.radiowaves.left.and.right.slash")
+                                    .foregroundColor(.red)
+                                    .font(.caption)
+                                Text("OFFLINE")
+                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.red)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.black.opacity(0.6))
+                        .cornerRadius(12)
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, geometry.safeAreaInsets.top > 0 ? 0 : 8)
+                    
+                    // Team Indicator
+                    if let currentUser = gameManager.currentUser,
+                       let teamId = currentUser.teamId,
+                       let team = gameManager.gameSession?.teams.first(where: { $0.id == teamId }) {
+                        HStack {
+                            Spacer()
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(team.swiftUIColor)
+                                    .frame(width: 12, height: 12)
+                                
+                                Text(team.name.uppercased())
+                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.white)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 6)
+                            .background(Color.black.opacity(0.8))
+                            .cornerRadius(20)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(team.swiftUIColor.opacity(0.8), lineWidth: 2)
+                            )
+                            .shadow(color: team.swiftUIColor.opacity(0.3), radius: 3)
+                            .padding(.trailing)
+                        }
+                        .padding(.top, 8)
+                    }
+                    
+                    Spacer()
+                    
+                    // Bottom Control Panel - Ergonomic layout
+                    VStack(spacing: 12) {
+                        // Primary action buttons row
+                        HStack(spacing: 12) {
+                            // Chat Button
+                            TacticalButton(
+                                icon: "text.bubble.fill",
+                                label: "CHAT",
+                                color: .green,
+                                hasNotification: hasUnreadMessages,
+                                size: geometry.size.width < 380 ? .small : .medium
+                            ) {
+                                showingChat = true
+                            }
+                            
+                            // Pin Placement
+                            TacticalButton(
+                                icon: "mappin.and.ellipse",
+                                label: "PIN",
+                                color: .red,
+                                size: geometry.size.width < 380 ? .small : .medium
+                            ) {
+                                pendingPinCoordinate = mapRegion.center
+                                showingPinSelector = true
+                            }
+                            
+                            // Center on User
+                            TacticalButton(
+                                icon: "location.fill",
+                                label: "CENTER",
+                                color: .purple,
+                                size: geometry.size.width < 380 ? .small : .medium
+                            ) {
+                                centerOnUser()
+                            }
+                            
+                            // Team Manager (Host only)
+                            if gameManager.isHost {
+                                TacticalButton(
+                                    icon: "person.3.fill",
+                                    label: "TEAMS",
+                                    color: .orange,
+                                    size: geometry.size.width < 380 ? .small : .medium
+                                ) {
+                                    showingTeamManager = true
+                                }
+                            }
+                        }
+                        
+                        // Secondary action buttons row
+                        HStack(spacing: 12) {
+                            // Quick Messages
+                            TacticalButton(
+                                icon: "bolt.fill",
+                                label: "QUICK",
+                                color: .blue,
+                                size: .small
+                            ) {
+                                showingQuickMessages = true
+                            }
+                            
+                            // Tactical Alerts
+                            TacticalButton(
+                                icon: "exclamationmark.triangle.fill",
+                                label: "ALERT",
+                                color: .yellow,
+                                size: .small
+                            ) {
+                                showingTacticalAlerts = true
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, geometry.safeAreaInsets.bottom > 0 ? 0 : 16)
+                }
             }
             .onAppear {
                 if !hasInitiallySetRegion {
-                updateMapRegion()
+                    updateMapRegion()
                     hasInitiallySetRegion = true
                 }
             }
             .onChange(of: locationManager.location) { _ in
                 updatePlayerLocation()
                 
-                // Only auto-center on first location fix or if explicitly enabled
                 if shouldAutoCenter && !hasInitiallySetRegion {
                     updateMapRegion()
                     hasInitiallySetRegion = true
-                    shouldAutoCenter = false // Disable auto-centering after first time
+                    shouldAutoCenter = false
                 }
             }
-            
-            // UI Overlays
-            VStack {
-                // Top Bar
-                HStack {
-                    // Session Info Button
-                    Button(action: { showingSessionInfo = true }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "shield.lefthalf.fill")
-                                .font(.caption)
-                            Text(gameManager.sessionCode ?? "N/A")
-                                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                            Divider()
-                                .frame(height: 12)
-                            Image(systemName: "person.2.fill")
-                                .font(.caption)
-                            Text("\(totalPlayerCount)")
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.black.opacity(0.8))
-                        .foregroundColor(.green)
-                        .cornerRadius(20)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.green.opacity(0.3), lineWidth: 1)
-                        )
-                    }
-                    
-                    Spacer()
-                    
-                    // Top-Right Button Stack (Chat & Quick Messages)
-                    VStack(spacing: 8) {
-                        // Chat Button
-                        Button(action: { showingChat = true }) {
-                            ZStack {
-                                VStack(spacing: 2) {
-                                    Image(systemName: "text.bubble.fill")
-                                        .font(.title3)
-                                    Text("CHAT")
-                                        .font(.system(size: 7, weight: .bold, design: .monospaced))
-                                }
-                                .foregroundColor(.black)
-                                .frame(width: 50, height: 50)
-                                .background(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [Color.green, Color.green.opacity(0.8)]),
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                )
-                                .clipShape(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.green.opacity(0.3), lineWidth: 2)
-                                )
-                                .shadow(color: .green.opacity(0.3), radius: 3)
-                                
-                                // Unread message indicator
-                                if hasUnreadMessages {
-                                    Circle()
-                                        .fill(Color.red)
-                                        .frame(width: 12, height: 12)
-                                        .overlay(
-                                            Circle()
-                                                .stroke(Color.white, lineWidth: 1)
-                                        )
-                                        .offset(x: 15, y: -15)
-                                }
-                            }
-                        }
-                        
-                        // Quick Messages Button
-                        Button(action: { showingQuickMessages = true }) {
-                            VStack(spacing: 2) {
-                                Image(systemName: "bolt.fill")
-                                    .font(.title3)
-                                Text("QUICK")
-                                    .font(.system(size: 7, weight: .bold, design: .monospaced))
-                            }
-                            .foregroundColor(.black)
-                            .frame(width: 50, height: 50)
-                            .background(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [Color.blue, Color.blue.opacity(0.8)]),
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.blue.opacity(0.3), lineWidth: 2)
-                            )
-                            .shadow(color: .blue.opacity(0.3), radius: 3)
-                        }
-                    }
-                    
-                    // Connection Status
-                    HStack(spacing: 4) {
-                        if gameManager.isConnected {
-                            Image(systemName: "antenna.radiowaves.left.and.right")
-                                .foregroundColor(.green)
-                                .font(.title3)
-                            Text("ONLINE")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundColor(.green)
-                        } else {
-                            Image(systemName: "antenna.radiowaves.left.and.right.slash")
-                                .foregroundColor(.red)
-                                .font(.title3)
-                            Text("OFFLINE")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundColor(.red)
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.black.opacity(0.6))
-                    .cornerRadius(12)
-                }
-                .padding()
-                
-                // Middle Right Side Controls (Pin & Alert)
-                HStack {
-                    Spacer()
-                    
-                    VStack(spacing: 12) {
-                        // Pin Placement
-                        Button(action: {
-                            // Place pin at crosshair location (map center)
-                            pendingPinCoordinate = mapRegion.center
-                            showingPinSelector = true
-                        }) {
-                            VStack(spacing: 2) {
-                                Image(systemName: "mappin.and.ellipse")
-                                    .font(.title3)
-                                Text("PIN")
-                                    .font(.system(size: 7, weight: .bold, design: .monospaced))
-                            }
-                            .foregroundColor(.white)
-                            .frame(width: 50, height: 50)
-                            .background(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [Color.red, Color.red.opacity(0.8)]),
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.red.opacity(0.3), lineWidth: 2)
-                            )
-                            .shadow(color: .red.opacity(0.3), radius: 3)
-                        }
-                        
-                        // Tactical Alerts
-                        Button(action: { showingTacticalAlerts = true }) {
-                            VStack(spacing: 2) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.title3)
-                                Text("ALERT")
-                                    .font(.system(size: 7, weight: .bold, design: .monospaced))
-                            }
-                            .foregroundColor(.black)
-                            .frame(width: 50, height: 50)
-                            .background(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [Color.yellow, Color.yellow.opacity(0.8)]),
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.yellow.opacity(0.3), lineWidth: 2)
-                            )
-                            .shadow(color: .yellow.opacity(0.3), radius: 3)
-                        }
-                    }
-                    .padding(.trailing, 20)
-                }
-                
-                Spacer()
-                
-                // Bottom Controls (Center & Teams)
-                HStack {
-                    Spacer()
-                    
-                    // Center on User
-                    Button(action: centerOnUser) {
-                        VStack(spacing: 2) {
-                            Image(systemName: "scope")
-                                .font(.title2)
-                            Text("CENTER")
-                                .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        }
-                        .foregroundColor(.white)
-                        .frame(width: 55, height: 55)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color.purple, Color.purple.opacity(0.8)]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .clipShape(Circle())
-                        .overlay(
-                            Circle()
-                                .stroke(Color.purple.opacity(0.3), lineWidth: 2)
-                        )
-                        .shadow(color: .purple.opacity(0.3), radius: 3)
-                    }
-                    
-                    // Team Manager (Host only)
-                    if gameManager.isHost {
-                        Button(action: { showingTeamManager = true }) {
-                            VStack(spacing: 2) {
-                                Image(systemName: "person.3.sequence.fill")
-                                    .font(.title2)
-                                Text("TEAMS")
-                                    .font(.system(size: 8, weight: .bold, design: .monospaced))
-                            }
-                            .foregroundColor(.black)
-                            .frame(width: 55, height: 55)
-                            .background(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [Color.orange, Color.orange.opacity(0.8)]),
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.orange.opacity(0.3), lineWidth: 2)
-                            )
-                            .shadow(color: .orange.opacity(0.3), radius: 3)
-                        }
-                    }
-                }
-                .padding()
-            }
-            
-            // Team Indicator
-            if let currentUser = gameManager.currentUser,
-               let teamId = currentUser.teamId,
-               let team = gameManager.gameSession?.teams.first(where: { $0.id == teamId }) {
-                VStack {
-                    HStack {
-                        Spacer()
-                        HStack(spacing: 8) {
-                            Image(systemName: "shield.lefthalf.fill")
-                                .font(.caption)
-                                .foregroundColor(team.swiftUIColor)
-                            
-                            Text(team.name)
-                                .font(.system(size: 16, weight: .bold, design: .monospaced))
-                                .foregroundColor(.white)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.black.opacity(0.8))
-                        .cornerRadius(20)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(team.swiftUIColor.opacity(0.8), lineWidth: 2)
-                        )
-                        .shadow(color: team.swiftUIColor.opacity(0.3), radius: 3)
-                        .padding(.trailing)
-                    }
-                    Spacer()
-                }
-                .padding(.top, 80)
+            .onReceive(updateTimer) { _ in
+                // Force UI update periodically to ensure map annotations refresh
+                lastUpdateTime = Date()
             }
         }
         .sheet(isPresented: $showingSessionInfo) {
@@ -429,43 +331,68 @@ struct GameMapView<GameManager: GameManagerProtocol>: View {
     
     // MARK: - Computed Properties
     
+    // In GameMapView.swift, update the computed properties:
+
     private var allMapItems: [MapAnnotationItem] {
         var items: [MapAnnotationItem] = []
         
-        // Add current user
-        if let currentUser = gameManager.currentUser,
-           let location = locationManager.playerLocation {
-            items.append(.player(
-                player: currentUser,
-                coordinate: location.coordinate,
-                isCurrentUser: true
-            ))
-            print("🗺️ Added current user \(currentUser.name) to map with team: \(currentUser.teamId ?? "none")")
-        }
-        
-        // Add other players (only teammates)
-        let currentUserTeamId = gameManager.currentUser?.teamId
-        for player in gameManager.otherPlayers {
-            // Only show players on the same team (allies)
-            if player.teamId == currentUserTeamId, 
-               let teamId = currentUserTeamId, // Ensure current user has a team
-               let location = player.location {
-                items.append(.player(
-                    player: player,
-                    coordinate: location.coordinate,
-                    isCurrentUser: false
-                ))
-                print("🗺️ Added teammate \(player.name) to map with team: \(player.teamId ?? "none")")
-            } else if player.teamId != currentUserTeamId && player.location != nil {
-                print("🚫 Hiding enemy \(player.name) from map (team: \(player.teamId ?? "none"))")
-            } else if player.location == nil {
-                print("⚠️ Player \(player.name) has no location, not showing on map")
+        // Try to use interpolated state from network manager first
+        if let interpolatedState = networkManager.interpolatedState {
+            // Add players from interpolated state
+            for playerState in interpolatedState.players {
+                if let position = playerState.position {
+                    let location = PlayerLocation(
+                        latitude: position.latitude,
+                        longitude: position.longitude,
+                        heading: position.heading,
+                        altitude: nil,
+                        accuracy: nil,
+                        speed: position.speed,
+                        timestamp: position.lastUpdate
+                    )
+                    
+                    let player = Player(
+                        id: playerState.id,
+                        name: playerState.name,
+                        teamId: playerState.teamId,
+                        location: location,
+                        isHost: playerState.isHost
+                    )
+                    
+                    items.append(.player(
+                        player: player,
+                        coordinate: location.coordinate,
+                        isCurrentUser: playerState.id == gameManager.currentUser?.id
+                    ))
+                }
             }
-        }
-        
-        // Add pins
-        if let pins = gameManager.gameSession?.pins {
-            for pin in pins {
+            
+            // Add pins from interpolated state
+            for pin in interpolatedState.pins {
+                items.append(.pin(
+                    pin: pin,
+                    coordinate: pin.coordinate.coreLocationCoordinate
+                ))
+            }
+        } else {
+            // Fallback to game session data when network manager state is not available
+            guard let session = gameManager.gameSession else {
+                return items
+            }
+            
+            // Add players from game session
+            for player in session.players.values {
+                if let location = player.location {
+                    items.append(.player(
+                        player: player,
+                        coordinate: location.coordinate,
+                        isCurrentUser: player.id == gameManager.currentUser?.id
+                    ))
+                }
+            }
+            
+            // Add pins from game session
+            for pin in session.pins {
                 items.append(.pin(
                     pin: pin,
                     coordinate: pin.coordinate.coreLocationCoordinate
@@ -475,14 +402,12 @@ struct GameMapView<GameManager: GameManagerProtocol>: View {
         
         return items
     }
-    
     private var totalPlayerCount: Int {
         1 + gameManager.otherPlayers.count
     }
     
     private var hasUnreadMessages: Bool {
-        // This would track unread messages in a real implementation
-        false
+        false // Implement unread message tracking
     }
     
     // MARK: - Actions
@@ -504,23 +429,94 @@ struct GameMapView<GameManager: GameManagerProtocol>: View {
     
     private func centerOnUser() {
         if let location = locationManager.location {
-            withAnimation(.easeInOut(duration: 1.0)) {
+            withAnimation(.easeInOut(duration: 0.5)) {
                 mapRegion = MKCoordinateRegion(
                     center: location.coordinate,
                     span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
                 )
             }
-            // Re-enable auto-centering for a brief moment if user manually centers
             shouldAutoCenter = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                 shouldAutoCenter = false
             }
         }
     }
-    
+}
 
-    
+// MARK: - Tactical Button Component
 
+struct TacticalButton: View {
+    let icon: String
+    let label: String
+    let color: Color
+    var hasNotification: Bool = false
+    var size: ButtonSize = .medium
+    
+    let action: () -> Void
+    
+    enum ButtonSize {
+        case small, medium
+        
+        var dimension: CGFloat {
+            switch self {
+            case .small: return 45
+            case .medium: return 55
+            }
+        }
+        
+        var iconSize: Font {
+            switch self {
+            case .small: return .title3
+            case .medium: return .title2
+            }
+        }
+        
+        var labelSize: CGFloat {
+            switch self {
+            case .small: return 7
+            case .medium: return 8
+            }
+        }
+    }
+    
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                VStack(spacing: 2) {
+                    Image(systemName: icon)
+                        .font(size.iconSize)
+                    Text(label)
+                        .font(.system(size: size.labelSize, weight: .bold, design: .monospaced))
+                }
+                .foregroundColor(color == .yellow ? .black : .white)
+                .frame(width: size.dimension, height: size.dimension)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [color, color.opacity(0.8)]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .clipShape(Circle())
+                .overlay(
+                    Circle()
+                        .stroke(color.opacity(0.3), lineWidth: 2)
+                )
+                .shadow(color: color.opacity(0.3), radius: 3)
+                
+                if hasNotification {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 12, height: 12)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white, lineWidth: 1)
+                        )
+                        .offset(x: size.dimension * 0.3, y: -size.dimension * 0.3)
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Map Items
@@ -532,7 +528,7 @@ enum MapAnnotationItem: Identifiable {
     var id: String {
         switch self {
         case .player(let player, _, _):
-            return "player_\(player.id)"
+            return "player_\(player.id)_\(Date().timeIntervalSince1970)"
         case .pin(let pin, _):
             return "pin_\(pin.id)"
         }
@@ -552,6 +548,8 @@ enum MapAnnotationItem: Identifiable {
     let gameManager = WebSocketGameManager()
     GameMapView(
         gameManager: gameManager,
-        locationManager: LocationManager()
+        locationManager: LocationManager(),
+        networkManager: gameManager.networkManager
     )
-} 
+}
+
